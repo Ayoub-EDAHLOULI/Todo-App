@@ -1,0 +1,14 @@
+# Node
+node_modules/
+npm-debug.log*
+.env
+.env.local
+
+# Vagrant
+.vagrant/
+
+# Ansible
+*.retry
+
+# OS
+.DS_Store
