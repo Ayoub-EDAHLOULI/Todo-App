@@ -28,7 +28,7 @@ const newTask = async (req, res) => {
       return res.status(401).json({ message: "Authorization header missing" });
     }
 
-    const tokenInfos = jwt.verify(token, "secret");
+    const tokenInfos = jwt.verify(token, process.env.JWT_SECRET);
     const email = tokenInfos.data;
 
     if (!tokenInfos) {

@@ -1,0 +1,36 @@
+services:
+  mongo:
+    image: mongo:7
+    container_name: todo-mongo
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo-data:/data/db
+
+  server:
+    build: ./server
+    container_name: todo-server
+    restart: unless-stopped
+    environment:
+      PORT: 5000
+      HOST: 0.0.0.0
+      DATABASE: mongodb://mongo:27017/todoapp
+      DATABASE_PASSWORD: unused
+      JWT_SECRET: ${JWT_SECRET}
+    depends_on:
+      - mongo
+    ports:
+      - "5000:5000"
+
+  client:
+    build: ./client
+    container_name: todo-client
+    restart: unless-stopped
+    depends_on:
+      - server
+    ports:
+      - "3000:80"
+
+volumes:
+  mongo-data:
