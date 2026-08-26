@@ -106,8 +106,22 @@
   hosts: k8s
   become: true
   tasks:
+    - name: Ensure k3s config directory exists
+      file:
+        path: /etc/rancher/k3s
+        state: directory
+        mode: "0755"
+
+    - name: Write k3s config (TLS SAN + kubeconfig permissions)
+      copy:
+        dest: /etc/rancher/k3s/config.yaml
+        content: |
+          tls-san:
+            - 192.168.56.20
+          write-kubeconfig-mode: "0644"
+
     - name: Install k3s
-      shell: curl -sfL https://get.k3s.io | INSTALL_K3S_EXEC="--write-kubeconfig-mode 644" sh -
+      shell: curl -sfL https://get.k3s.io | sh -
       args:
         creates: /usr/local/bin/k3s
 
