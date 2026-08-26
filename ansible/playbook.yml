@@ -1,0 +1,174 @@
+---
+# ---------- Common: Docker + Git on both VMs ----------
+- name: Common provisioning (Docker + Git)
+  hosts: all
+  become: true
+  tasks:
+    - name: Update apt cache
+      apt:
+        update_cache: true
+        cache_valid_time: 3600
+
+    - name: Install prerequisites
+      apt:
+        name:
+          - git
+          - curl
+          - ca-certificates
+          - gnupg
+          - apt-transport-https
+        state: present
+
+    - name: Add Docker GPG key
+      apt_key:
+        url: https://download.docker.com/linux/ubuntu/gpg
+        state: present
+
+    - name: Add Docker apt repository
+      apt_repository:
+        repo: "deb [arch=amd64] https://download.docker.com/linux/ubuntu {{ ansible_distribution_release }} stable"
+        state: present
+
+    - name: Install Docker
+      apt:
+        name:
+          - docker-ce
+          - docker-ce-cli
+          - containerd.io
+        state: present
+        update_cache: true
+
+    - name: Add vagrant user to docker group
+      user:
+        name: vagrant
+        groups: docker
+        append: true
+
+# ---------- Jenkins VM ----------
+- name: Provision Jenkins VM
+  hosts: jenkins
+  become: true
+  tasks:
+    - name: Install Java (required by Jenkins)
+      apt:
+        name: openjdk-21-jre
+        state: present
+
+    - name: Ensure keyrings directory exists
+      file:
+        path: /usr/share/keyrings
+        state: directory
+        mode: "0755"
+
+    - name: Download Jenkins GPG key
+      get_url:
+        url: https://pkg.jenkins.io/debian-stable/jenkins.io-2026.key
+        dest: /usr/share/keyrings/jenkins-keyring.asc
+        mode: "0644"
+        force: true
+
+    - name: Add Jenkins apt repository list file
+      copy:
+        dest: /etc/apt/sources.list.d/jenkins.list
+        content: "deb [signed-by=/usr/share/keyrings/jenkins-keyring.asc] https://pkg.jenkins.io/debian-stable binary/\n"
+
+    - name: Update apt cache after adding Jenkins repo
+      apt:
+        update_cache: true
+
+    - name: Install Jenkins
+      apt:
+        name: jenkins
+        state: present
+
+    - name: Enable and start Jenkins
+      systemd:
+        name: jenkins
+        enabled: true
+        state: started
+
+    - name: Add jenkins user to docker group
+      user:
+        name: jenkins
+        groups: docker
+        append: true
+
+    - name: Install kubectl
+      shell: |
+        curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+        install -o root -g root -m 0755 kubectl /usr/local/bin/kubectl
+        rm -f kubectl
+      args:
+        creates: /usr/local/bin/kubectl
+
+# ---------- Kubernetes VM (k3s) ----------
+- name: Provision Kubernetes VM (k3s)
+  hosts: k8s
+  become: true
+  tasks:
+    - name: Install k3s
+      shell: curl -sfL https://get.k3s.io | INSTALL_K3S_EXEC="--write-kubeconfig-mode 644" sh -
+      args:
+        creates: /usr/local/bin/k3s
+
+    - name: Wait for k3s kubeconfig to exist
+      wait_for:
+        path: /etc/rancher/k3s/k3s.yaml
+        state: present
+        timeout: 60
+
+    - name: Create .kube directory for vagrant user
+      file:
+        path: /home/vagrant/.kube
+        state: directory
+        owner: vagrant
+        group: vagrant
+        mode: "0755"
+
+    - name: Copy k3s kubeconfig to vagrant user
+      copy:
+        src: /etc/rancher/k3s/k3s.yaml
+        dest: /home/vagrant/.kube/config
+        remote_src: true
+        owner: vagrant
+        group: vagrant
+        mode: "0600"
+
+    - name: Point kubeconfig at the VM's private IP
+      replace:
+        path: /home/vagrant/.kube/config
+        regexp: 'https://127\.0\.0\.1:6443'
+        replace: "https://192.168.56.20:6443"
+
+    - name: Add MongoDB GPG key
+      apt_key:
+        url: https://www.mongodb.org/static/pgp/server-7.0.asc
+        state: present
+
+    - name: Add MongoDB apt repository
+      apt_repository:
+        repo: "deb [arch=amd64] https://repo.mongodb.org/apt/ubuntu jammy/mongodb-org/7.0 multiverse"
+        state: present
+
+    - name: Install MongoDB
+      apt:
+        name: mongodb-org
+        state: present
+        update_cache: true
+
+    - name: Enable and start MongoDB
+      systemd:
+        name: mongod
+        enabled: true
+        state: started
+
+    - name: Install NGINX
+      apt:
+        name: nginx
+        state: present
+
+    - name: Enable and start NGINX
+      systemd:
+        name: nginx
+        enabled: true
+        state: started
