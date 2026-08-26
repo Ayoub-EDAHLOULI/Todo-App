@@ -1,0 +1,19 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: todo-client
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: todo-client
+  template:
+    metadata:
+      labels:
+        app: todo-client
+    spec:
+      containers:
+        - name: client
+          image: IMAGE_PLACEHOLDER_CLIENT
+          ports:
+            - containerPort: 80
