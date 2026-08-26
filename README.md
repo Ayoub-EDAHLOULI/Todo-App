@@ -110,13 +110,3 @@ todo-app/
 ├── Vagrantfile # Définition des VMs
 ├── docker-compose.yml # Test local (hors Jenkins/K8s)
 └── README.md
-
-## Limitation connue
-
-Au premier déploiement, le serveur peut tenter de se connecter à MongoDB avant que celui-ci ne soit prêt (`ECONNREFUSED`). Un redémarrage du pod suffit à résoudre ce problème :
-
-```bash
-kubectl rollout restart deployment todo-server
-```
-
-Une amélioration future consisterait à ajouter un `initContainer` attendant que MongoDB soit accessible avant de démarrer le serveur.
